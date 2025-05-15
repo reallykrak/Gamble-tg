@@ -1,288 +1,205 @@
-import telebot
-from telebot import types
-import json
-import os
-import time
-import random
-
-TOKEN = "7763395301:AAF3thVNH883Rzmz0RTpsx3wuiCG_VLpa-g"
-ADMINS = [8121637254]  # Buraya kendi Telegram ID'nizi yazın
+import json, random, time
+from telegram import Update, ReplyKeyboardMarkup
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
 DATA_FILE = "users.json"
-bot = telebot.TeleBot(TOKEN)
+ADMINS = [8121637254]  # Kendi Telegram ID'ni buraya ekle
 
-# Kullanıcı verilerini yükle veya oluştur
 def load_data():
-    if not os.path.exists(DATA_FILE):
-        with open(DATA_FILE, "w") as f:
-            json.dump({}, f)
-    with open(DATA_FILE, "r") as f:
-        return json.load(f)
+    try:
+        with open(DATA_FILE, "r") as f:
+            return json.load(f)
+    except:
+        return {}
 
 def save_data(data):
     with open(DATA_FILE, "w") as f:
         json.dump(data, f)
 
-def check_user(uid):
+def get_user(user_id):
     data = load_data()
-    uid = str(uid)
-    if uid not in data:
-        data[uid] = {
-            "balance": 50000,
-            "last_bonus": 0,
-            "last_mission": 0,
-            "bank": 0,
-            "last_faiz": 0,
-            "cekilis_hakki": 1
-        }
+    if str(user_id) not in data:
+        data[str(user_id)] = {"jeton": 500, "admin": False, "bonus": 0, "faiz": 0, "görev": 0}
         save_data(data)
     return data
 
-def is_admin(uid):
-    return uid in ADMINS
-
-def get_balance(uid):
-    data = check_user(uid)
-    return data[str(uid)]["balance"]
-
-def add_balance(uid, amount):
-    data = check_user(uid)
-    uid = str(uid)
-    data[uid]["balance"] += amount
+def update_user(user_id, field, value):
+    data = load_data()
+    data[str(user_id)][field] = value
     save_data(data)
 
-def subtract_balance(uid, amount):
-    data = check_user(uid)
-    uid = str(uid)
-    if data[uid]["balance"] >= amount:
-        data[uid]["balance"] -= amount
-        save_data(data)
-        return True
-    else:
-        return False
+def change_jeton(user_id, amount):
+    data = load_data()
+    data[str(user_id)]["jeton"] += amount
+    save_data(data)
 
-@bot.message_handler(commands=["start"])
-def cmd_start(m):
-    check_user(m.from_user.id)
-    markup = types.InlineKeyboardMarkup(row_width=2)
-    buttons = [
-        types.InlineKeyboardButton("Bakiye", callback_data="bakiye"),
-        types.InlineKeyboardButton("Bonus", callback_data="bonus"),
-        types.InlineKeyboardButton("Kazı Kazan", callback_data="kazikazan"),
-        types.InlineKeyboardButton("Günlük Görev", callback_data="gorev"),
-        types.InlineKeyboardButton("Slot", callback_data="slot"),
-        types.InlineKeyboardButton("Hırsızlık", callback_data="hirsizlik"),
-        types.InlineKeyboardButton("Bahis", callback_data="bahis"),
-        types.InlineKeyboardButton("Çekiliş", callback_data="cekilis"),
-        types.InlineKeyboardButton("Faiz", callback_data="faiz"),
-        types.InlineKeyboardButton("Lider", callback_data="lider"),
-    ]
-    markup.add(*buttons)
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    get_user(update.effective_user.id)
+    keyboard = [["/bakiye", "/bonus", "/faiz"], ["/görev", "/slot", "/hırsızlık"],
+                ["/bahis", "/çekiliş", "/kazıkazan"], ["/gönder", "/top", "/yapımcı"]]
+    await update.message.reply_text("Hoş geldin! Kumar Botuna başladın.", reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True))
 
-    reply = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    reply.row("/bakiye", "/id", "/bonus", "/kazikazan")
-    reply.row("/görev", "/slot", "/hırsızlık", "/bahis")
-    reply.row("/çekiliş", "/faiz", "/lider")
-    reply.row("/paragonder", "/parabas", "/adminekle")
+async def bakiye(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    data = get_user(update.effective_user.id)
+    await update.message.reply_text(f"Jeton bakiyen: {data[str(update.effective_user.id)]['jeton']}")
 
-    bot.send_message(m.chat.id, "Kumar Botuna Hoş Geldin! Aşağıdaki menüden işlem seçebilirsin.", reply_markup=reply)
-    bot.send_message(m.chat.id, "İşlem menüsü:", reply_markup=markup)
-
-@bot.message_handler(commands=["id"])
-def cmd_id(m):
-    bot.reply_to(m, f"ID'niz: {m.from_user.id}")
-
-@bot.message_handler(commands=["bakiye"])
-def cmd_bakiye(m):
-    bal = get_balance(m.from_user.id)
-    bot.reply_to(m, f"Bakiyeniz: {bal} TL")
-
-@bot.callback_query_handler(func=lambda c: True)
-def callback_handler(c):
-    uid = c.from_user.id
-    data = check_user(uid)
-
-    if c.data == "bakiye":
-        bot.answer_callback_query(c.id, f"Bakiyeniz: {data[str(uid)]['balance']} TL", show_alert=True)
-
-    elif c.data == "bonus":
-        now = time.time()
-        last = data[str(uid)]["last_bonus"]
-        if now - last >= 24*3600:
-            bonus_amt = 50000
-            data[str(uid)]["balance"] += bonus_amt
-            data[str(uid)]["last_bonus"] = now
-            save_data(data)
-            bot.answer_callback_query(c.id, f"Bonus olarak {bonus_amt} TL kazandınız!", show_alert=True)
-        else:
-            kalan = int(24*3600 - (now - last))
-            bot.answer_callback_query(c.id, f"Bonus 24 saatte bir alınır. Kalan süre: {kalan//3600} saat {(kalan%3600)//60} dakika", show_alert=True)
-
-    elif c.data == "kazikazan":
-        kazikazan_game(c.message)
-
-    elif c.data == "gorev":
-        gorev_system(c.message)
-
-    elif c.data == "slot":
-        slot_game(c.message)
-
-    elif c.data == "hirsizlik":
-        bot.send_message(c.message.chat.id, "Hırsızlık yapmak için komut: /hirsiz <hedef_id>")
-
-    elif c.data == "bahis":
-        bot.send_message(c.message.chat.id, "Bahis yapmak için komut: /bahis <miktar>")
-
-    elif c.data == "cekilis":
-        cekilis_game(c.message)
-
-    elif c.data == "faiz":
-        faiz_system(c.message)
-
-    elif c.data == "lider":
-        lider_tablosu(c.message)
-
-# Bonus komutu (komut olarak)
-@bot.message_handler(commands=["bonus"])
-def cmd_bonus(m):
-    uid = m.from_user.id
-    data = check_user(uid)
-    now = time.time()
-    last = data[str(uid)]["last_bonus"]
-    if now - last >= 24*3600:
-        bonus_amt = 50000
-        data[str(uid)]["balance"] += bonus_amt
-        data[str(uid)]["last_bonus"] = now
-        save_data(data)
-        bot.reply_to(m, f"Bonus olarak {bonus_amt} TL kazandınız!")
-    else:
-        kalan = int(24*3600 - (now - last))
-        bot.reply_to(m, f"Bonus 24 saatte bir alınır. Kalan süre: {kalan//3600} saat {(kalan%3600)//60} dakika")
-
-# Kazı Kazan oyunu
-def kazikazan_game(m):
-    uid = m.from_user.id
-    data = check_user(uid)
-    chance = random.randint(1, 100)
-    if chance <= 30:
-        kazanilan = random.randint(10000, 70000)
-        data[str(uid)]["balance"] += kazanilan
-        save_data(data)
-        bot.send_message(m.chat.id, f"Tebrikler! Kazı kazan oyununda {kazanilan} TL kazandınız.")
-    else:
-        kaybedilen = random.randint(1000, 10000)
-        if data[str(uid)]["balance"] >= kaybedilen:
-            data[str(uid)]["balance"] -= kaybedilen
-            save_data(data)
-            bot.send_message(m.chat.id, f"Üzgünüz, {kaybedilen} TL kaybettiniz.")
-        else:
-            bot.send_message(m.chat.id, "Yeterli bakiyeniz yok. Kaybetmediniz ama kazanamadınız da.")
-
-# Günlük görev sistemi
-@bot.message_handler(commands=["görev", "gorev"])
-def gorev_system(m):
-    uid = m.from_user.id
-    data = check_user(uid)
-    now = time.time()
-    last = data[str(uid)]["last_mission"]
-    if now - last >= 24*3600:
-        odul = random.randint(10000, 50000)
-        data[str(uid)]["balance"] += odul
-        data[str(uid)]["last_mission"] = now
-        save_data(data)
-        bot.reply_to(m, f"Günlük görev başarıyla tamamlandı! {odul} TL kazandınız.")
-    else:
-        kalan = int(24*3600 - (now - last))
-        bot.reply_to(m, f"Günlük görev zaten tamamlandı. Yeni görev için {kalan//3600} saat {(kalan%3600)//60} dakika bekleyin.")
-
-# Slot oyunu
-@bot.message_handler(commands=["slot"])
-def slot_game(m):
-    uid = m.from_user.id
-    data = check_user(uid)
-
-    semboller = ["🍒", "🍋", "🍉", "🔔", "⭐", "7️⃣"]
-    slot1 = random.choice(semboller)
-    slot2 = random.choice(semboller)
-    slot3 = random.choice(semboller)
-
-    sonuc = f"{slot1} | {slot2} | {slot3}"
-
-    if slot1 == slot2 == slot3:
-        odul = random.randint(50000, 150000)
-        data[str(uid)]["balance"] += odul
-        save_data(data)
-        bot.reply_to(m, f"Slot sonucu: {sonuc}\nTEBRİKLER! {odul} TL kazandınız!")
-    else:
-        kayip = random.randint(10000, 50000)
-        if data[str(uid)]["balance"] >= kayip:
-            data[str(uid)]["balance"] -= kayip
-            save_data(data)
-            bot.reply_to(m, f"Slot sonucu: {sonuc}\nÜzgünüz, {kayip} TL kaybettiniz.")
-        else:
-            bot.reply_to(m, f"Slot sonucu: {sonuc}\nYeterli bakiyeniz yok, kaybetmediniz ama kazanamadınız da.")
-
-# Hırsızlık komutu: /hirsiz <id>
-@bot.message_handler(commands=["hirsiz", "hırsızlık"])
-def hirsizlik(m):
-    from_id = m.from_user.id
-    data = check_user(from_id)
-    args = m.text.split()
-    if len(args) < 2:
-        bot.reply_to(m, "Kullanım: /hirsiz <hedef_id>")
+async def bonus(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = str(update.effective_user.id)
+    data = get_user(uid)
+    if time.time() - data[uid]["bonus"] < 3600:
+        await update.message.reply_text("Bonus almak için 1 saat beklemelisin.")
         return
-    hedef_id = args[1]
-    data = check_user(hedef_id)
-    hedef_bal = data[str(hedef_id)]["balance"]
-    if hedef_bal < 1000:
-        bot.reply_to(m, "Hedefin yeterli bakiyesi yok.")
-        return
-    kazanma_sansi = random.randint(1, 100)
-    if kazanma_sansi <= 40:
-        miktar = random.randint(1000, min(hedef_bal, 20000))
-        data[str(hedef_id)]["balance"] -= miktar
-        data[str(from_id)]["balance"] += miktar
-        save_data(data)
-        bot.reply_to(m, f"Tebrikler! {miktar} TL çaldınız.")
-    else:
-        ceza = random.randint(1000, 5000)
-        if data[str(from_id)]["balance"] >= ceza:
-            data[str(from_id)]["balance"] -= ceza
-            save_data(data)
-            bot.reply_to(m, f"Yakalandınız! {ceza} TL ceza ödediniz.")
-        else:
-            bot.reply_to(m, "Yakalandınız ama ceza ödeyecek paranız yok.")
+    bonus = random.randint(50, 150)
+    change_jeton(uid, bonus)
+    update_user(uid, "bonus", time.time())
+    await update.message.reply_text(f"{bonus} jeton bonus kazandın!")
 
-# Bahis oyunu: /bahis <miktar>
-@bot.message_handler(commands=["bahis"])
-def bahis(m):
-    uid = m.from_user.id
-    data = check_user(uid)
-    args = m.text.split()
-    if len(args) < 2:
-        bot.reply_to(m, "Kullanım: /bahis <miktar>")
+async def faiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = str(update.effective_user.id)
+    data = get_user(uid)
+    if time.time() - data[uid]["faiz"] < 3600:
+        await update.message.reply_text("Faiz için 1 saat beklemelisin.")
+        return
+    faiz = int(data[uid]["jeton"] * 0.1)
+    change_jeton(uid, faiz)
+    update_user(uid, "faiz", time.time())
+    await update.message.reply_text(f"{faiz} jeton faiz kazandın!")
+
+async def görev(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = str(update.effective_user.id)
+    data = get_user(uid)
+    if time.time() - data[uid]["görev"] < 86400:
+        await update.message.reply_text("Yeni görev için 24 saat beklemelisin.")
+        return
+    ödül = random.randint(100, 300)
+    change_jeton(uid, ödül)
+    update_user(uid, "görev", time.time())
+    await update.message.reply_text(f"Görev tamamlandı! {ödül} jeton kazandın.")
+
+async def slot(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = str(update.effective_user.id)
+    emojis = ["🍒", "🍋", "🍉"]
+    result = [random.choice(emojis) for _ in range(3)]
+    kazan = result[0] == result[1] == result[2]
+    if kazan:
+        change_jeton(uid, 100)
+        await update.message.reply_text(f"{' | '.join(result)}\nKazandın! +100 jeton")
+    else:
+        change_jeton(uid, -50)
+        await update.message.reply_text(f"{' | '.join(result)}\nKaybettin! -50 jeton")
+
+async def hırsızlık(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = str(update.effective_user.id)
+    data = get_user(uid)
+    hedef = random.choice([u for u in data if u != uid])
+    miktar = random.randint(50, 200)
+    success = random.random() < 0.5
+    if success and data[hedef]["jeton"] >= miktar:
+        change_jeton(hedef, -miktar)
+        change_jeton(uid, miktar)
+        await update.message.reply_text(f"{miktar} jeton çaldın!")
+    else:
+        await update.message.reply_text("Hırsızlık başarısız oldu!")
+
+async def bahis(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = str(update.effective_user.id)
+    try:
+        miktar = int(context.args[0])
+    except:
+        await update.message.reply_text("Kullanım: /bahis <miktar>")
+        return
+    if miktar <= 0:
+        return
+    data = get_user(uid)
+    if data[uid]["jeton"] < miktar:
+        await update.message.reply_text("Yetersiz bakiye.")
+        return
+    kazan = random.random() < 0.5
+    change_jeton(uid, miktar if kazan else -miktar)
+    msg = f"Bahis kazandın! +{miktar}" if kazan else f"Bahis kaybettin! -{miktar}"
+    await update.message.reply_text(msg)
+
+async def çekiliş(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    data = load_data()
+    winner = random.choice(list(data.keys()))
+    ödül = 300
+    change_jeton(winner, ödül)
+    await update.message.reply_text(f"Çekilişi kazanan: {winner} (+{ödül} jeton)")
+
+async def kazıkazan(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = str(update.effective_user.id)
+    change_jeton(uid, -50)
+    kazan = random.random() < 0.3
+    if kazan:
+        ödül = random.randint(100, 500)
+        change_jeton(uid, ödül)
+        await update.message.reply_text(f"Kazandın! +{ödül} jeton")
+    else:
+        await update.message.reply_text("Kaybettin! Daha şanslı olabilirsin.")
+
+async def gönder(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        hedef = context.args[0]
+        miktar = int(context.args[1])
+    except:
+        await update.message.reply_text("Kullanım: /gönder <id> <miktar>")
+        return
+    uid = str(update.effective_user.id)
+    data = get_user(uid)
+    if data[uid]["jeton"] < miktar:
+        await update.message.reply_text("Yetersiz bakiye.")
+        return
+    get_user(hedef)
+    change_jeton(uid, -miktar)
+    change_jeton(hedef, miktar)
+    await update.message.reply_text(f"{miktar} jeton gönderildi.")
+
+async def id(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(f"ID: {update.effective_user.id}")
+
+async def yapımcı(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("Bot yapımcısı: @reallykrak")
+
+async def para(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = str(update.effective_user.id)
+    if uid not in ADMINS:
+        await update.message.reply_text("Yetkin yok.")
         return
     try:
-        miktar = int(args[1])
+        miktar = int(context.args[0])
+        change_jeton(uid, miktar)
+        await update.message.reply_text(f"{miktar} jeton eklendi.")
     except:
-        bot.reply_to(m, "Lütfen geçerli bir sayı girin.")
-        return
-    if miktar < 1000:
-        bot.reply_to(m, "Minimum bahis 1000 TL'dir.")
-        return
-    if data[str(uid)]["balance"] < miktar:
-        bot.reply_to(m, "Yeterli bakiyeniz yok.")
-        return
-    kazanma_sansi = random.randint(1, 100)
-    if kazanma_sansi <= 50:
-        kazanilan = miktar * 2
-        data[str(uid)]["balance"] += kazanilan
-        save_data(data)
-        bot.reply_to(m, f"Tebrikler! Bahsi kazandınız ve {kazanilan} TL kazandınız.")
-    else:
-        data[str(uid)]["balance"] -= miktar
-        save_data(data)
-        bot.reply_to(m, f"Bahsi kaybettiniz ve {miktar} TL kaybettiniz.")
+        await update.message.reply_text("Kullanım: /para <miktar>")
 
-# Çekiliş oyunu
-@bot.message_handler(commands=["çekiliş
+async def admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = str(update.effective_user.id)
+    if uid not in ADMINS:
+        await update.message.reply_text("Yetkin yok.")
+        return
+    try:
+        hedef = context.args[0]
+        data = get_user(hedef)
+        data[hedef]["admin"] = True
+        save_data(data)
+        await update.message.reply_text(f"{hedef} artık admin.")
+    except:
+        await update.message.reply_text("Kullanım: /admin <id>")
+
+async def top(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    data = load_data()
+    sıralı = sorted(data.items(), key=lambda x: x[1]["jeton"], reverse=True)[:10]
+    mesaj = "\n".join([f"{i+1}. {k} - {v['jeton']} jeton" for i, (k, v) in enumerate(sıralı)])
+    await update.message.reply_text("En Zenginler:\n" + mesaj)
+
+# BOTU BAŞLAT
+app = ApplicationBuilder().token("7763395301:AAF3thVNH883Rzmz0RTpsx3wuiCG_VLpa-g").build()
+komutlar = [
+    ("start", start), ("bakiye", bakiye), ("bonus", bonus), ("faiz", faiz), ("görev", görev),
+    ("slot", slot), ("hırsızlık", hırsızlık), ("bahis", bahis), ("çekiliş", çekiliş),
+    ("kazıkazan", kazıkazan), ("gönder", gönder), ("id", id), ("yapımcı", yapımcı),
+    ("para", para), ("admin", admin), ("top", top)
+]
+for ad, fonk in komutlar:
+    app.add_handler(CommandHandler(ad, fonk))
+app.run_polling()
