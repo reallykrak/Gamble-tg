@@ -3,14 +3,13 @@ import asyncio
 from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 
-api_id = 25404254  # Buraya kendi api_id'nizi yazın
+api_id = 25404254
 api_hash = "a0159a4e4d780841ac88f0c002d0231a"
 bot_token = "7763395301:AAF3thVNH883Rzmz0RTpsx3wuiCG_VLpa-g"
 
 app = Client("kumar_bot", api_id=api_id, api_hash=api_hash, bot_token=bot_token)
 
-users = {}  # {user_id: {"coin": 50000, "bank": 0, "borsa": {"altin": 0, "elmas": 0, "dolar": 0, "euro": 0}}}
-
+users = {}
 borsa_fiyat = {
     "altin": 1000,
     "elmas": 2000,
@@ -18,7 +17,6 @@ borsa_fiyat = {
     "euro": 12
 }
 
-# --- Yardımcı Fonksiyonlar --- #
 def menu():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("🎁 Günlük Bonus", callback_data="bonus")],
@@ -36,13 +34,11 @@ def init_user(user_id):
             "borsa": {"altin": 0, "elmas": 0, "dolar": 0, "euro": 0}
         }
 
-# --- Başlangıç --- #
 @app.on_message(filters.command("start") & filters.group)
 async def start(_, message: Message):
     init_user(message.from_user.id)
     await message.reply(f"Merhaba {message.from_user.first_name}! Kumar botuna hoş geldin.\nAşağıdaki menüden işlemlerini seçebilirsin.", reply_markup=menu())
 
-# --- Callback Handler --- #
 @app.on_callback_query()
 async def callback_handler(client, callback_query):
     user_id = callback_query.from_user.id
@@ -70,7 +66,6 @@ async def callback_handler(client, callback_query):
         msg = f"📉 Güncel Borsa Fiyatları:\nAltın: {b['altin']} | Senin: {p['altin']}\nElmas: {b['elmas']} | Senin: {p['elmas']}\nDolar: {b['dolar']} | Senin: {p['dolar']}\nEuro: {b['euro']} | Senin: {p['euro']}\n\nSatın Al: /al altin 1\nSat: /sat altin 1"
         await callback_query.message.edit_text(msg, reply_markup=menu())
 
-# --- Slot --- #
 @app.on_message(filters.command("slot") & filters.group)
 async def slot(_, message: Message):
     try:
@@ -90,7 +85,6 @@ async def slot(_, message: Message):
     except:
         await message.reply("Kullanım: /slot <miktar>")
 
-# --- Kazı Kazan --- #
 @app.on_message(filters.command("kazi") & filters.group)
 async def kazi(_, message: Message):
     try:
@@ -110,7 +104,6 @@ async def kazi(_, message: Message):
     except:
         await message.reply("Kullanım: /kazi <miktar>")
 
-# --- Banka --- #
 @app.on_message(filters.command("yatir") & filters.group)
 async def yatir(_, message: Message):
     try:
@@ -144,7 +137,6 @@ async def faiz(_, message: Message):
     users[uid]["bank"] += faiz
     await message.reply(f"💰 Bankadan faiz aldın! +{faiz} coin")
 
-# --- Borsa --- #
 @app.on_message(filters.command("al") & filters.group)
 async def al(_, message: Message):
     try:
@@ -167,7 +159,7 @@ async def sat(_, message: Message):
         adet = int(adet)
         uid = message.from_user.id
         if users[uid]["borsa"][tur] < adet:
-            return await message.reply("Bu kadar {tur} yok!")
+            return await message.reply(f"Bu kadar {tur} yok!")
         gelir = borsa_fiyat[tur] * adet
         users[uid]["borsa"][tur] -= adet
         users[uid]["coin"] += gelir
@@ -175,7 +167,6 @@ async def sat(_, message: Message):
     except:
         await message.reply("Kullanım: /sat <altin/elmas/dolar/euro> <adet>")
 
-# --- Borsa Güncellemesi --- #
 async def borsa_guncelle():
     while True:
         for item in borsa_fiyat:
@@ -183,7 +174,6 @@ async def borsa_guncelle():
             borsa_fiyat[item] = max(1, borsa_fiyat[item] + degisim)
         await asyncio.sleep(60)
 
-# --- Bot Başlat --- #
 @app.on_message(filters.private)
 async def private_block(_, message):
     await message.reply("Bu bot sadece gruplarda kullanılabilir.")
@@ -198,8 +188,11 @@ async def bakiye(_, message):
 async def id(_, message):
     await message.reply(f"Kullanıcı ID: {message.from_user.id}")
 
-# --- Botu Başlat --- #
-app.start()
-asyncio.get_event_loop().create_task(borsa_guncelle())
-print("Bot çalışıyor...")
-app.idle()
+# --- BOTU BAŞLAT --- #
+async def main():
+    await app.start()
+    asyncio.create_task(borsa_guncelle())
+    print("Bot çalışıyor...")
+    await asyncio.Event().wait()  # Sonsuza kadar bekler
+
+asyncio.run(main())
