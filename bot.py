@@ -1,159 +1,205 @@
-import telebot
-from telebot import types
-import json
-import os
 import random
-from datetime import datetime, timedelta
+import asyncio
+from pyrogram import Client, filters
+from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 
-BOT_TOKEN = "7763395301:AAF3thVNH883Rzmz0RTpsx3wuiCG_VLpa-g"
-bot = telebot.TeleBot(BOT_TOKEN)
+api_id = 25404254  # Buraya kendi api_id'nizi yazın
+api_hash = "a0159a4e4d780841ac88f0c002d0231a"
+bot_token = "7763395301:AAF3thVNH883Rzmz0RTpsx3wuiCG_VLpa-g"
 
-DATA_FILE = "veri.json"
+app = Client("kumar_bot", api_id=api_id, api_hash=api_hash, bot_token=bot_token)
 
-def veri_yukle():
-    if not os.path.exists(DATA_FILE):
-        with open(DATA_FILE, "w") as f:
-            json.dump({}, f)
-    with open(DATA_FILE, "r") as f:
-        return json.load(f)
+users = {}  # {user_id: {"coin": 50000, "bank": 0, "borsa": {"altin": 0, "elmas": 0, "dolar": 0, "euro": 0}}}
 
-def veri_kaydet(veri):
-    with open(DATA_FILE, "w") as f:
-        json.dump(veri, f, indent=4)
+borsa_fiyat = {
+    "altin": 1000,
+    "elmas": 2000,
+    "dolar": 10,
+    "euro": 12
+}
 
-def kullanici_kontrol_et(user_id):
-    veri = veri_yukle()
-    if str(user_id) not in veri:
-        veri[str(user_id)] = {
-            "bakiye": 1000,
-            "banka": 0,
-            "admin": False,
-            "giris": str(datetime.now()),
-            "bonus": "",
-            "görev": ""
+# --- Yardımcı Fonksiyonlar --- #
+def menu():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🎁 Günlük Bonus", callback_data="bonus")],
+        [InlineKeyboardButton("🎰 Slot", callback_data="slot"),
+         InlineKeyboardButton("🎯 Kazı Kazan", callback_data="kazi")],
+        [InlineKeyboardButton("🏦 Banka & Faiz", callback_data="banka")],
+        [InlineKeyboardButton("📉 Borsa", callback_data="borsa")],
+    ])
+
+def init_user(user_id):
+    if user_id not in users:
+        users[user_id] = {
+            "coin": 50000,
+            "bank": 0,
+            "borsa": {"altin": 0, "elmas": 0, "dolar": 0, "euro": 0}
         }
-        veri_kaydet(veri)
 
-@bot.message_handler(commands=["start"])
-def start(m):
-    kullanici_kontrol_et(m.from_user.id)
-    kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    kb.row("🎰 Slot", "🎁 Bonus", "💸 Para Gönder")
-    kb.row("🏦 Banka", "🎯 Bahis", "🎫 Kazı Kazan")
-    bot.reply_to(m, f"Merhaba {m.from_user.first_name}! Kumar Botuna hoş geldin!", reply_markup=kb)
+# --- Başlangıç --- #
+@app.on_message(filters.command("start") & filters.group)
+async def start(_, message: Message):
+    init_user(message.from_user.id)
+    await message.reply(f"Merhaba {message.from_user.first_name}! Kumar botuna hoş geldin.\nAşağıdaki menüden işlemlerini seçebilirsin.", reply_markup=menu())
 
-@bot.message_handler(commands=["bakiye"])
-def bakiye(m):
-    veri = veri_yukle()
-    user = veri[str(m.from_user.id)]
-    bot.reply_to(m, f"💰 Bakiye: {user['bakiye']} TL\n🏦 Banka: {user['banka']} TL")
+# --- Callback Handler --- #
+@app.on_callback_query()
+async def callback_handler(client, callback_query):
+    user_id = callback_query.from_user.id
+    init_user(user_id)
+    data = callback_query.data
 
-@bot.message_handler(commands=["bonus"])
-def bonus(m):
-    veri = veri_yukle()
-    user = veri[str(m.from_user.id)]
-    bugun = datetime.now().date()
-    if user["bonus"] == str(bugun):
-        bot.reply_to(m, "❌ Bugün zaten bonus aldın!")
-        return
-    bonus_miktar = random.randint(250, 1000)
-    user["bakiye"] += bonus_miktar
-    user["bonus"] = str(bugun)
-    veri_kaydet(veri)
-    bot.reply_to(m, f"🎁 Günlük bonus: {bonus_miktar} TL eklendi!")
+    if data == "bonus":
+        users[user_id]["coin"] += 50000
+        await callback_query.message.edit_text("🎁 Günlük bonus alındı! +50,000 coin", reply_markup=menu())
 
-@bot.message_handler(commands=["slot"])
-def slot(m):
-    veri = veri_yukle()
-    user = veri[str(m.from_user.id)]
-    if user["bakiye"] < 100:
-        bot.reply_to(m, "❌ Slot oynamak için en az 100 TL gerekir!")
-        return
-    user["bakiye"] -= 100
-    slotlar = ["🍒", "🍋", "🔔", "💎", "7️⃣"]
-    sonuc = [random.choice(slotlar) for _ in range(3)]
-    mesaj = "🎰 | " + " | ".join(sonuc) + " |\n"
-    if sonuc[0] == sonuc[1] == sonuc[2]:
-        kazan = 1000
-        user["bakiye"] += kazan
-        mesaj += f"✨ Tebrikler! {kazan} TL kazandın!"
-    else:
-        mesaj += "😢 Üzgünüm, kazanamadın."
-    veri_kaydet(veri)
-    bot.reply_to(m, mesaj)
+    elif data == "slot":
+        await callback_query.message.edit_text("🎰 Ne kadar coin ile slot oynamak istersin? (örn: /slot 5000)")
 
-@bot.message_handler(commands=["para"])
-def para_gonder(m):
+    elif data == "kazi":
+        await callback_query.message.edit_text("🎯 Ne kadar coin ile kazı kazan oynamak istersin? (örn: /kazi 1000)")
+
+    elif data == "banka":
+        bank = users[user_id]["bank"]
+        coin = users[user_id]["coin"]
+        await callback_query.message.edit_text(f"🏦 Bankadaki coin: {bank}\nCüzdan: {coin}\n\nPara çekme: /cek 1000\nPara yatırma: /yatir 1000\nFaiz alma: /faiz", reply_markup=menu())
+
+    elif data == "borsa":
+        b = borsa_fiyat
+        p = users[user_id]["borsa"]
+        msg = f"📉 Güncel Borsa Fiyatları:\nAltın: {b['altin']} | Senin: {p['altin']}\nElmas: {b['elmas']} | Senin: {p['elmas']}\nDolar: {b['dolar']} | Senin: {p['dolar']}\nEuro: {b['euro']} | Senin: {p['euro']}\n\nSatın Al: /al altin 1\nSat: /sat altin 1"
+        await callback_query.message.edit_text(msg, reply_markup=menu())
+
+# --- Slot --- #
+@app.on_message(filters.command("slot") & filters.group)
+async def slot(_, message: Message):
     try:
-        veri = veri_yukle()
-        user = veri[str(m.from_user.id)]
-        args = m.text.split()
-        hedef = int(args[1])
-        miktar = int(args[2])
-        if user["bakiye"] < miktar:
-            return bot.reply_to(m, "❌ Yetersiz bakiye!")
-        kullanici_kontrol_et(hedef)
-        user["bakiye"] -= miktar
-        veri[str(hedef)]["bakiye"] += miktar
-        veri_kaydet(veri)
-        bot.reply_to(m, f"✅ {hedef} ID'li kullanıcıya {miktar} TL gönderildi.")
+        miktar = int(message.text.split()[1])
+        uid = message.from_user.id
+        init_user(uid)
+        if users[uid]["coin"] < miktar:
+            return await message.reply("Yetersiz coin!")
+        kazandin = random.randint(1, 100) <= 40
+        if kazandin:
+            kazanc = miktar * 2
+            users[uid]["coin"] += kazanc
+            await message.reply(f"🎰 Kazandın! +{kazanc} coin")
+        else:
+            users[uid]["coin"] -= miktar
+            await message.reply(f"🎰 Kaybettin! -{miktar} coin")
     except:
-        bot.reply_to(m, "❗ Kullanım: /para kullanıcı_id miktar")
+        await message.reply("Kullanım: /slot <miktar>")
 
-@bot.message_handler(commands=["paraekle"])
-def admin_para(m):
-    veri = veri_yukle()
-    user = veri[str(m.from_user.id)]
-    if not user["admin"]:
-        return bot.reply_to(m, "❌ Yetkin yok.")
+# --- Kazı Kazan --- #
+@app.on_message(filters.command("kazi") & filters.group)
+async def kazi(_, message: Message):
     try:
-        _, hedef, miktar = m.text.split()
-        hedef = int(hedef)
-        miktar = int(miktar)
-        kullanici_kontrol_et(hedef)
-        veri[str(hedef)]["bakiye"] += miktar
-        veri_kaydet(veri)
-        bot.reply_to(m, f"✅ {hedef} kullanıcısına {miktar} TL eklendi.")
+        miktar = int(message.text.split()[1])
+        uid = message.from_user.id
+        init_user(uid)
+        if users[uid]["coin"] < miktar:
+            return await message.reply("Yetersiz coin!")
+        kazandin = random.randint(1, 100) <= 30
+        if kazandin:
+            kazanc = miktar * 2
+            users[uid]["coin"] += kazanc
+            await message.reply(f"🎯 Kazandın! +{kazanc} coin")
+        else:
+            users[uid]["coin"] -= miktar
+            await message.reply(f"🎯 Kaybettin! -{miktar} coin")
     except:
-        bot.reply_to(m, "❗ Kullanım: /paraekle kullanıcı_id miktar")
+        await message.reply("Kullanım: /kazi <miktar>")
 
-@bot.message_handler(commands=["admin"])
-def admin_ekle(m):
-    veri = veri_yukle()
-    user = veri[str(m.from_user.id)]
-    if not user["admin"]:
-        return bot.reply_to(m, "❌ Yetkin yok.")
+# --- Banka --- #
+@app.on_message(filters.command("yatir") & filters.group)
+async def yatir(_, message: Message):
     try:
-        _, hedef = m.text.split()
-        veri[str(int(hedef))]["admin"] = True
-        veri_kaydet(veri)
-        bot.reply_to(m, f"✅ {hedef} artık admin.")
+        miktar = int(message.text.split()[1])
+        uid = message.from_user.id
+        if users[uid]["coin"] < miktar:
+            return await message.reply("Yetersiz coin!")
+        users[uid]["coin"] -= miktar
+        users[uid]["bank"] += miktar
+        await message.reply(f"🏦 {miktar} coin bankaya yatırıldı.")
     except:
-        bot.reply_to(m, "❗ Kullanım: /admin kullanıcı_id")
+        await message.reply("Kullanım: /yatir <miktar>")
 
-@bot.message_handler(commands=["liderlik"])
-def liderlik(m):
-    veri = veri_yukle()
-    sirali = sorted(veri.items(), key=lambda x: x[1]["bakiye"] + x[1]["banka"], reverse=True)
-    mesaj = "🏆 En Zenginler:\n"
-    for i, (uid, data) in enumerate(sirali[:10], 1):
-        mesaj += f"{i}. ID {uid} — {data['bakiye']} + {data['banka']} TL\n"
-    bot.reply_to(m, mesaj)
+@app.on_message(filters.command("cek") & filters.group)
+async def cek(_, message: Message):
+    try:
+        miktar = int(message.text.split()[1])
+        uid = message.from_user.id
+        if users[uid]["bank"] < miktar:
+            return await message.reply("Bankada bu kadar yok!")
+        users[uid]["bank"] -= miktar
+        users[uid]["coin"] += miktar
+        await message.reply(f"🏦 {miktar} coin cüzdana çekildi.")
+    except:
+        await message.reply("Kullanım: /cek <miktar>")
 
-@bot.message_handler(func=lambda m: True)
-def cevapla(m):
-    if m.text == "🎰 Slot":
-        slot(m)
-    elif m.text == "🎁 Bonus":
-        bonus(m)
-    elif m.text == "💸 Para Gönder":
-        bot.reply_to(m, "Kullanım: /para kullanıcı_id miktar")
-    elif m.text == "🏦 Banka":
-        bot.reply_to(m, "Kullanım: /faiz | /banka yatır/çek miktar")
-    elif m.text == "🎯 Bahis":
-        bot.reply_to(m, "Komut: /bahis <1-6>")
-    elif m.text == "🎫 Kazı Kazan":
-        bot.reply_to(m, "Komut: /kazikazan")
+@app.on_message(filters.command("faiz") & filters.group)
+async def faiz(_, message: Message):
+    uid = message.from_user.id
+    faiz = int(users[uid]["bank"] * 0.05)
+    users[uid]["bank"] += faiz
+    await message.reply(f"💰 Bankadan faiz aldın! +{faiz} coin")
 
-print("Bot aktif.")
-bot.infinity_polling()
+# --- Borsa --- #
+@app.on_message(filters.command("al") & filters.group)
+async def al(_, message: Message):
+    try:
+        _, tur, adet = message.text.split()
+        adet = int(adet)
+        fiyat = borsa_fiyat[tur] * adet
+        uid = message.from_user.id
+        if users[uid]["coin"] < fiyat:
+            return await message.reply("Yetersiz coin!")
+        users[uid]["coin"] -= fiyat
+        users[uid]["borsa"][tur] += adet
+        await message.reply(f"✅ {adet} adet {tur} satın alındı.")
+    except:
+        await message.reply("Kullanım: /al <altin/elmas/dolar/euro> <adet>")
+
+@app.on_message(filters.command("sat") & filters.group)
+async def sat(_, message: Message):
+    try:
+        _, tur, adet = message.text.split()
+        adet = int(adet)
+        uid = message.from_user.id
+        if users[uid]["borsa"][tur] < adet:
+            return await message.reply("Bu kadar {tur} yok!")
+        gelir = borsa_fiyat[tur] * adet
+        users[uid]["borsa"][tur] -= adet
+        users[uid]["coin"] += gelir
+        await message.reply(f"💱 {adet} adet {tur} satıldı. +{gelir} coin")
+    except:
+        await message.reply("Kullanım: /sat <altin/elmas/dolar/euro> <adet>")
+
+# --- Borsa Güncellemesi --- #
+async def borsa_guncelle():
+    while True:
+        for item in borsa_fiyat:
+            degisim = random.randint(-50, 50)
+            borsa_fiyat[item] = max(1, borsa_fiyat[item] + degisim)
+        await asyncio.sleep(60)
+
+# --- Bot Başlat --- #
+@app.on_message(filters.private)
+async def private_block(_, message):
+    await message.reply("Bu bot sadece gruplarda kullanılabilir.")
+
+@app.on_message(filters.command("bakiye") & filters.group)
+async def bakiye(_, message):
+    uid = message.from_user.id
+    c = users[uid]["coin"]
+    await message.reply(f"Mevcut coin: {c}")
+
+@app.on_message(filters.command("id") & filters.group)
+async def id(_, message):
+    await message.reply(f"Kullanıcı ID: {message.from_user.id}")
+
+# --- Botu Başlat --- #
+app.start()
+asyncio.get_event_loop().create_task(borsa_guncelle())
+print("Bot çalışıyor...")
+app.idle()
