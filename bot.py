@@ -171,7 +171,7 @@ app.add_handler(CommandHandler("risk", risk))
 app.add_handler(CommandHandler("slot", slot))
 app.add_handler(CommandHandler("admin", admin))
 app.add_handler(CommandHandler("parabasma", parabasma))
-app.add_handler(CommandHandler("paragönder", paragönder))
+app.add_handler(CommandHandler("paragonder", paragönder))
 app.add_handler(CommandHandler("id", id))
 app.add_handler(CommandHandler("top", top))
 
