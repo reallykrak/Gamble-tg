@@ -2,14 +2,14 @@ import json
 import random
 from datetime import datetime, timedelta
 from telegram import Update, ReplyKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
 TOKEN = "7763395301:AAF3thVNH883Rzmz0RTpsx3wuiCG_VLpa-g"
 DATA_FILE = "data.json"
 SABIT_ADMINLER = [8121637254, 987654321]
 BAŞLANGIÇ_TL = 10000
 BONUS_TL = 50000
-BONUS_SÜRE = 86400  # saniye
+BONUS_SÜRE = 86400  # 24 saat
 
 # Ana menü
 main_menu = ReplyKeyboardMarkup([
@@ -18,11 +18,12 @@ main_menu = ReplyKeyboardMarkup([
     ["/slot 100", "/risk 100"]
 ], resize_keyboard=True)
 
+# Veri yönetimi
 def veri_yükle():
     try:
         with open(DATA_FILE, "r") as f:
             return json.load(f)
-    except:
+    except FileNotFoundError:
         return {}
 
 def veri_kaydet(data):
@@ -48,10 +49,14 @@ def tl_güncelle(user_id, miktar):
     data[str(user_id)]["tl"] += miktar
     veri_kaydet(data)
 
+# Komutlar
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     kullanıcı_kontrol(user_id)
-    await update.message.reply_text(f"Hoş geldin {update.effective_user.first_name}!\nHesabına {BAŞLANGIÇ_TL} TL yüklendi!", reply_markup=main_menu)
+    await update.message.reply_text(
+        f"Hoş geldin {update.effective_user.first_name}!\nHesabına {BAŞLANGIÇ_TL} TL yüklendi!",
+        reply_markup=main_menu
+    )
 
 async def bakiye(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -66,18 +71,22 @@ async def bonus(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = data[str(user_id)]
     son = datetime.strptime(user["last_bonus"], "%Y-%m-%d %H:%M:%S")
     now = datetime.now()
+
     if now - son >= timedelta(seconds=BONUS_SÜRE):
         user["last_bonus"] = now.strftime("%Y-%m-%d %H:%M:%S")
         user["tl"] += BONUS_TL
-        veri_kaydet(data)
-        await update.message.reply_text(f"Günlük bonus alındı! +{BONUS_TL:,} TL")
+        msg = f"Günlük bonus alındı! +{BONUS_TL:,} TL"
     else:
         kalan = timedelta(seconds=BONUS_SÜRE) - (now - son)
-        await update.message.reply_text(f"Bonus zaten alındı!\nYeniden almak için bekle: {str(kalan).split('.')[0]}")
+        msg = f"Bonus zaten alındı!\nYeniden almak için bekle: {str(kalan).split('.')[0]}"
+
+    veri_kaydet(data)
+    await update.message.reply_text(msg)
 
 async def kazikazan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     kullanıcı_kontrol(user_id)
+
     try:
         miktar = int(context.args[0])
     except:
@@ -85,6 +94,7 @@ async def kazikazan(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     data = veri_yükle()
     user = data[str(user_id)]
+
     if user["tl"] < miktar:
         return await update.message.reply_text("Yetersiz bakiye!")
 
@@ -95,12 +105,14 @@ async def kazikazan(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg = f"Tebrikler! Kazı Kazan'dan {kazanç:,} TL kazandın!"
     else:
         msg = "Üzgünüm, bu sefer olmadı..."
+    
     veri_kaydet(data)
     await update.message.reply_text(msg)
 
 async def risk(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     kullanıcı_kontrol(user_id)
+
     try:
         miktar = int(context.args[0])
     except:
@@ -108,6 +120,7 @@ async def risk(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     data = veri_yükle()
     user = data[str(user_id)]
+
     if user["tl"] < miktar:
         return await update.message.reply_text("Yetersiz bakiye!")
 
@@ -118,12 +131,14 @@ async def risk(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg = f"Şanslısın! {kazanç:,} TL kazandın!"
     else:
         msg = "Kaybettin..."
+
     veri_kaydet(data)
     await update.message.reply_text(msg)
 
 async def slot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     kullanıcı_kontrol(user_id)
+
     try:
         miktar = int(context.args[0])
     except:
@@ -131,6 +146,7 @@ async def slot(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     data = veri_yükle()
     user = data[str(user_id)]
+
     if user["tl"] < miktar:
         return await update.message.reply_text("Yetersiz bakiye!")
 
@@ -141,6 +157,7 @@ async def slot(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg = f"JACKPOT! {kazanç:,} TL kazandın!"
     else:
         msg = "Slot kaybettin..."
+
     veri_kaydet(data)
     await update.message.reply_text(msg)
 
@@ -148,10 +165,12 @@ async def admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if not admin_mi(user_id):
         return await update.message.reply_text("Yetkisiz erişim.")
+
     try:
         hedef_id = int(context.args[0])
     except:
         return await update.message.reply_text("Kullanım: /admin [id]")
+
     data = veri_yükle()
     kullanıcı_kontrol(hedef_id)
     data[str(hedef_id)]["admin"] = True
@@ -162,6 +181,7 @@ async def parabasma(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if not admin_mi(user_id):
         return await update.message.reply_text("Sadece adminler para basabilir!")
+
     try:
         hedef_id = int(context.args[0])
         miktar = int(context.args[1])
@@ -174,6 +194,7 @@ async def parabasma(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def paragönder(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
+
     try:
         hedef_id = int(context.args[0])
         miktar = int(context.args[1])
@@ -197,15 +218,15 @@ async def id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     hedef = update.message.reply_to_message.from_user
     kullanıcı_kontrol(hedef.id)
     data = veri_yükle()
-    tl = data[str(hedef.id)]["tl"]
-    await update.message.reply_text(f"{hedef.first_name} bakiyesi: {tl:,} TL")
+    await update.message.reply_text(f"{hedef.first_name} bakiyesi: {data[str(hedef.id)]['tl']:,} TL")
 
 async def top(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = veri_yükle()
     sıralama = sorted(data.items(), key=lambda x: x[1]["tl"], reverse=True)[:10]
-    liste = "\n".join([f"{i+1}. {uid} - {veri['tl']:,} TL" for i, (uid, veri) in enumerate(sıralama)])
-    await update.message.reply_text(f"🏆 En Zenginler:\n{liste}")
+    metin = "\n".join([f"{i+1}. {uid} - {veri['tl']:,} TL" for i, (uid, veri) in enumerate(sıralama)])
+    await update.message.reply_text(f"🏆 En Zenginler:\n{metin}")
 
+# Bot başlatma
 if __name__ == "__main__":
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
