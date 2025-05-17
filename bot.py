@@ -13,9 +13,9 @@ BONUS_SÜRE = 86400  # 24 saat
 
 # Ana menü (bol emojili)
 main_menu = ReplyKeyboardMarkup([
-    ["🚀 /start", "🎁 /bonus"],
-    ["💰 /bakiye", "🎯 /kazikazan 100"],
-    ["🎰 /slot 100", "⚠️ /risk 100"]
+    ["🚀start", "🎁bonus"],
+    ["💰bakiye", "🎯kazikazan 100"],
+    ["🎰slot 100", "⚠️risk 100"]
 ], resize_keyboard=True)
 
 # Veri yönetimi
