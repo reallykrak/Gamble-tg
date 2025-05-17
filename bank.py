@@ -1,5 +1,6 @@
 # bank.py
-from telegram import ParseMode, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.constants import ParseMode
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from utils import load_data, save_data
 
 # /bankayaekle: Kullanıcının cüzdanından bankaya coin aktarır.
