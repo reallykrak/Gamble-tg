@@ -15,7 +15,9 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 from telegram.ext import ApplicationBuilder
 
 app = ApplicationBuilder().token(config.TOKEN).build()
-dispatcher = updater.dispatcher
+from telegram.ext import ApplicationBuilder
+
+app = ApplicationBuilder().token(config.TOKEN).build()
 
 # Genel komutlar
 dispatcher.add_handler(CommandHandler("start", start))
