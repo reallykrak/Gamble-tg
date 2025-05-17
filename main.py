@@ -21,7 +21,7 @@ app = ApplicationBuilder().token(config.TOKEN).build()
 
 # Genel komutlar
 app.add_handler(CommandHandler("start", start))
-dispatcher.add_handler(CallbackQueryHandler(katildim_callback, pattern="katildim"))
+app.add_handler(CallbackQueryHandler(katildim_callback, pattern="katildim"))
 dispatcher.add_handler(CommandHandler("yardım", yardim))
 dispatcher.add_handler(CommandHandler("bonus", bonus))
 dispatcher.add_handler(CommandHandler("bakiye", bakiye))
