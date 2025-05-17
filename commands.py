@@ -1,5 +1,5 @@
 # commands.py
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ParseMode
+from telegram.constants import ParseMode
 from utils import load_data, save_data, register_user
 
 # /start: Botu başlatır, kullanıcı kayıt edilir ve katılım mesajı gönderilir
