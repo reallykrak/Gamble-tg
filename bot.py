@@ -71,7 +71,7 @@ async def bakiye(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     kullanıcı_kontrol(user_id)
     data = veri_yükle()
-    await update.message.reply_text(f"💼 Bakiyen: {data[str(user_id)]['tl']:,} coin")
+    await update.message.reply_text(f"💼 Bakiyen: {data[str(user_id)]['tl']:,} TL")
 
 async def bonus(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
