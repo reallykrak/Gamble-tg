@@ -1,261 +1,178 @@
-import json
-import random
-from datetime import datetime, timedelta
-from telegram import Update, ReplyKeyboardMarkup
+import json, os, time, random
+from telegram import Update, KeyboardButton, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
-TOKEN = "7763395301:AAF3thVNH883Rzmz0RTpsx3wuiCG_VLpa-g"
-DATA_FILE = "data.json"
-SABIT_ADMINLER = [8121637254, 987654321]
-BAŞLANGIÇ_TL = 10000
-BONUS_TL = 50000
-BONUS_SÜRE = 86400  # 24 saat
+DATA_FILE = "veri.json"
+admins = [8121637254]  # Kendi Telegram ID'ni buraya ekle
 
-# Ana menü (bol emojili)
-main_menu = ReplyKeyboardMarkup([
-    ["🚀start", "🎁bonus"],
-    ["💰bakiye", "🎯kazikazan 100"],
-    ["🎰slot 100", "⚠️risk 100"]
-], resize_keyboard=True)
+# Veri işlemleri
+def veri_yukle():
+    if not os.path.exists(DATA_FILE):
+        with open(DATA_FILE, "w") as f:
+            json.dump({}, f)
+    with open(DATA_FILE, "r") as f:
+        return json.load(f)
 
-# Veri yönetimi
-def veri_yükle():
-    try:
-        with open(DATA_FILE, "r") as f:
-            return json.load(f)
-    except FileNotFoundError:
-        return {}
-
-def veri_kaydet(data):
+def veri_kaydet(veri):
     with open(DATA_FILE, "w") as f:
-        json.dump(data, f, indent=4)
+        json.dump(veri, f)
 
-def kullanıcı_kontrol(user_id):
-    data = veri_yükle()
-    if str(user_id) not in data:
-        data[str(user_id)] = {
-            "tl": 0,
-            "last_bonus": "1970-01-01 00:00:00",
-            "admin": False,
-            "ilk_giris": True
-        }
-        veri_kaydet(data)
+def para_al(uid):
+    veri = veri_yukle()
+    return veri.get(str(uid), {}).get("para", 0)
 
-def admin_mi(user_id):
-    data = veri_yükle()
-    return user_id in SABIT_ADMINLER or data.get(str(user_id), {}).get("admin", False)
+def para_ekle(uid, miktar):
+    veri = veri_yukle()
+    uid = str(uid)
+    if uid not in veri:
+        veri[uid] = {"para": 0}
+    veri[uid]["para"] += miktar
+    veri_kaydet(veri)
 
-def tl_güncelle(user_id, miktar):
-    data = veri_yükle()
-    data[str(user_id)]["tl"] += miktar
-    veri_kaydet(data)
+def admin_kontrol(uid):
+    return uid in admins
 
 # Komutlar
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    kullanıcı_kontrol(user_id)
-    data = veri_yükle()
-    user = data[str(user_id)]
-
-    if user["ilk_giris"]:
-        user["tl"] += BAŞLANGIÇ_TL
-        user["ilk_giris"] = False
-        msg = f"👋 Hoş geldin {update.effective_user.first_name}!\nHesabına başlangıç olarak 💸 {BAŞLANGIÇ_TL:,} TL yüklendi!"
-    else:
-        msg = f"👋 Tekrar hoş geldin {update.effective_user.first_name}!"
-    
-    veri_kaydet(data)
-    await update.message.reply_text(msg, reply_markup=main_menu)
+    uid = update.effective_user.id
+    para_ekle(uid, 10000)
+    butonlar = [
+        [KeyboardButton("/bakiye"), KeyboardButton("/bonus")],
+        [KeyboardButton("/kazikazan"), KeyboardButton("/risk")],
+        [KeyboardButton("/slot")]
+    ]
+    await update.message.reply_text("Hoş geldin! 10.000 coin verildi.", reply_markup=ReplyKeyboardMarkup(butonlar, resize_keyboard=True))
 
 async def bakiye(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    kullanıcı_kontrol(user_id)
-    data = veri_yükle()
-    await update.message.reply_text(f"💼 Bakiyen: {data[str(user_id)]['tl']:,} TL")
+    uid = update.effective_user.id
+    await update.message.reply_text(f"Bakiye: {para_al(uid)} coin")
 
 async def bonus(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    kullanıcı_kontrol(user_id)
-    data = veri_yükle()
-    user = data[str(user_id)]
-    son = datetime.strptime(user["last_bonus"], "%Y-%m-%d %H:%M:%S")
-    now = datetime.now()
-
-    if now - son >= timedelta(seconds=BONUS_SÜRE):
-        user["last_bonus"] = now.strftime("%Y-%m-%d %H:%M:%S")
-        user["tl"] += BONUS_TL
-        msg = f"🎁 Günlük bonus alındı! +{BONUS_TL:,} TL"
+    uid = str(update.effective_user.id)
+    veri = veri_yukle()
+    user = veri.get(uid, {"para": 0})
+    now = time.time()
+    last = user.get("bonus", 0)
+    if now - last >= 86400:
+        user["bonus"] = now
+        user["para"] += 50000
+        veri[uid] = user
+        veri_kaydet(veri)
+        await update.message.reply_text("Tebrikler! 50.000 coin bonus aldın.")
     else:
-        kalan = timedelta(seconds=BONUS_SÜRE) - (now - son)
-        msg = f"⏳ Bonus zaten alındı!\nYeniden almak için bekle: {str(kalan).split('.')[0]}"
-
-    veri_kaydet(data)
-    await update.message.reply_text(msg)
+        kalan = int(86400 - (now - last))
+        saat = kalan // 3600
+        dakika = (kalan % 3600) // 60
+        await update.message.reply_text(f"Bonus için bekle: {saat} saat {dakika} dakika")
 
 async def kazikazan(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    kullanıcı_kontrol(user_id)
-
-    try:
-        miktar = int(context.args[0])
-    except:
-        return await update.message.reply_text("❗ Kullanım: /kazikazan [miktar]")
-
-    data = veri_yükle()
-    user = data[str(user_id)]
-
-    if user["tl"] < miktar:
-        return await update.message.reply_text("💀 Yetersiz bakiye!")
-
-    user["tl"] -= miktar
-    if random.randint(1, 100) <= 30:
-        kazanç = miktar * 3
-        user["tl"] += kazanç
-        msg = f"🎯 Tebrikler! Kazı Kazan'dan {kazanç:,} TL kazandın!"
+    uid = update.effective_user.id
+    if para_al(uid) < 100:
+        await update.message.reply_text("Yetersiz coin!")
+        return
+    para_ekle(uid, -100)
+    if random.random() < 0.3:
+        kazanc = 400
+        para_ekle(uid, kazanc)
+        await update.message.reply_text(f"Kazandın! +{kazanc} coin")
     else:
-        msg = "💀 Üzgünüm, bu sefer olmadı..."
-    
-    veri_kaydet(data)
-    await update.message.reply_text(msg)
+        await update.message.reply_text("Kaybettin!")
 
 async def risk(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    kullanıcı_kontrol(user_id)
-
-    try:
-        miktar = int(context.args[0])
-    except:
-        return await update.message.reply_text("❗ Kullanım: /risk [miktar]")
-
-    data = veri_yükle()
-    user = data[str(user_id)]
-
-    if user["tl"] < miktar:
-        return await update.message.reply_text("💀 Yetersiz bakiye!")
-
-    user["tl"] -= miktar
-    if random.randint(1, 100) <= 40:
-        kazanç = miktar * 2
-        user["tl"] += kazanç
-        msg = f"⚡ Şanslısın! {kazanç:,} TL kazandın!"
+    uid = update.effective_user.id
+    if len(context.args) != 1 or not context.args[0].isdigit():
+        await update.message.reply_text("Kullanım: /risk <miktar>")
+        return
+    miktar = int(context.args[0])
+    if para_al(uid) < miktar:
+        await update.message.reply_text("Yetersiz coin!")
+        return
+    para_ekle(uid, -miktar)
+    if random.random() < 0.4:
+        kazanc = miktar * 2
+        para_ekle(uid, kazanc)
+        await update.message.reply_text(f"Şanslısın! +{kazanc} coin kazandın.")
     else:
-        msg = "💣 Kaybettin..."
-
-    veri_kaydet(data)
-    await update.message.reply_text(msg)
+        await update.message.reply_text("Kaybettin!")
 
 async def slot(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    kullanıcı_kontrol(user_id)
-
-    try:
-        miktar = int(context.args[0])
-    except:
-        return await update.message.reply_text("❗ Kullanım: /slot [miktar]")
-
-    data = veri_yükle()
-    user = data[str(user_id)]
-
-    if user["tl"] < miktar:
-        return await update.message.reply_text("💀 Yetersiz bakiye!")
-
-    user["tl"] -= miktar
-
-    semboller = ["🍇", "🍍", "🍒", "🏆", "🏆"]
-    sonuç = [random.choice(semboller) for _ in range(3)]
-
-    if sonuç[0] == sonuç[1] == sonuç[2]:
-        kazanç = miktar * 4
-        user["tl"] += kazanç
-        durum = "🎉 JACKPOT!"
-        detay = f"{kazanç:,} coin kazandın!"
+    uid = update.effective_user.id
+    if para_al(uid) < 100:
+        await update.message.reply_text("Yetersiz coin!")
+        return
+    para_ekle(uid, -100)
+    if random.random() < 0.3:
+        kazanc = 400
+        para_ekle(uid, kazanc)
+        await update.message.reply_text(f"Kazandın! +{kazanc} coin")
     else:
-        durum = "💀 Kaybettin..."
-        detay = ""
-
-    veri_kaydet(data)
-    mesaj = f"{' | '.join(sonuç)}\n\n{durum} {detay}"
-    await update.message.reply_text(mesaj)
+        await update.message.reply_text("Kaybettin!")
 
 async def admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    if not admin_mi(user_id):
-        return await update.message.reply_text("🚫 Yetkisiz erişim.")
-
-    try:
-        hedef_id = int(context.args[0])
-    except:
-        return await update.message.reply_text("Kullanım: /admin [id]")
-
-    data = veri_yükle()
-    kullanıcı_kontrol(hedef_id)
-    data[str(hedef_id)]["admin"] = True
-    veri_kaydet(data)
-    await update.message.reply_text(f"✅ {hedef_id} artık admin!")
+    uid = update.effective_user.id
+    if not admin_kontrol(uid):
+        await update.message.reply_text("Yetkin yok.")
+        return
+    if len(context.args) != 1 or not context.args[0].isdigit():
+        await update.message.reply_text("Kullanım: /admin <kullanıcı_id>")
+        return
+    yeni = int(context.args[0])
+    admins.append(yeni)
+    await update.message.reply_text(f"{yeni} artık admin!")
 
 async def parabasma(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    if not admin_mi(user_id):
-        return await update.message.reply_text("🚫 Sadece adminler para basabilir!")
-
-    try:
-        hedef_id = int(context.args[0])
-        miktar = int(context.args[1])
-    except:
-        return await update.message.reply_text("Kullanım: /parabasma [id] [miktar]")
-
-    kullanıcı_kontrol(hedef_id)
-    tl_güncelle(hedef_id, miktar)
-    await update.message.reply_text(f"💸 {hedef_id} kişisine {miktar:,} TL basıldı!")
+    uid = update.effective_user.id
+    if not admin_kontrol(uid):
+        await update.message.reply_text("Yetkin yok.")
+        return
+    if len(context.args) != 2 or not context.args[0].isdigit() or not context.args[1].isdigit():
+        await update.message.reply_text("Kullanım: /parabasma <kullanıcı_id> <miktar>")
+        return
+    hedef = int(context.args[0])
+    miktar = int(context.args[1])
+    para_ekle(hedef, miktar)
+    await update.message.reply_text(f"{hedef} ID'li kişiye {miktar} coin verildi.")
 
 async def paragönder(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-
-    try:
-        hedef_id = int(context.args[0])
-        miktar = int(context.args[1])
-    except:
-        return await update.message.reply_text("Kullanım: /paragönder [id] [miktar]")
-
-    data = veri_yükle()
-    kullanıcı_kontrol(hedef_id)
-
-    if data[str(user_id)]["tl"] < miktar:
-        return await update.message.reply_text("💀 Yetersiz bakiye!")
-
-    data[str(user_id)]["tl"] -= miktar
-    data[str(hedef_id)]["tl"] += miktar
-    veri_kaydet(data)
-    await update.message.reply_text(f"📤 {miktar:,} TL gönderildi!")
+    uid = update.effective_user.id
+    if len(context.args) != 2 or not context.args[0].isdigit() or not context.args[1].isdigit():
+        await update.message.reply_text("Kullanım: /paragönder <kullanıcı_id> <miktar>")
+        return
+    hedef = int(context.args[0])
+    miktar = int(context.args[1])
+    if para_al(uid) < miktar:
+        await update.message.reply_text("Yetersiz coin!")
+        return
+    para_ekle(uid, -miktar)
+    para_ekle(hedef, miktar)
+    await update.message.reply_text(f"{miktar} coin gönderildi.")
 
 async def id(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message.reply_to_message:
-        return await update.message.reply_text("Lütfen bir mesaja yanıt ver.")
-    hedef = update.message.reply_to_message.from_user
-    kullanıcı_kontrol(hedef.id)
-    data = veri_yükle()
-    await update.message.reply_text(f"👤 {hedef.first_name} bakiyesi: {data[str(hedef.id)]['tl']:,} coin")
+    hedef = update.message.reply_to_message.from_user if update.message.reply_to_message else update.effective_user
+    uid = hedef.id
+    await update.message.reply_text(f"Kullanıcı: {hedef.full_name}\nID: {uid}\nBakiye: {para_al(uid)} coin")
 
 async def top(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    data = veri_yükle()
-    sıralama = sorted(data.items(), key=lambda x: x[1]["tl"], reverse=True)[:10]
-    metin = "\n".join([f"{i+1}. 🪪 {uid} - 💰 {veri['tl']:,} coin" for i, (uid, veri) in enumerate(sıralama)])
-    await update.message.reply_text(f"🏆 En Zenginler:\n\n{metin}")
+    veri = veri_yukle()
+    sıralama = sorted(veri.items(), key=lambda x: x[1].get("para", 0), reverse=True)[:10]
+    mesaj = "En Zenginler:\n\n"
+    for i, (uid, user) in enumerate(sıralama, 1):
+        mesaj += f"{i}. {uid} - {user.get('para', 0)} coin\n"
+    await update.message.reply_text(mesaj)
 
-# Bot başlatma
-if __name__ == "__main__":
-    app = ApplicationBuilder().token(TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("bakiye", bakiye))
-    app.add_handler(CommandHandler("bonus", bonus))
-    app.add_handler(CommandHandler("kazikazan", kazikazan))
-    app.add_handler(CommandHandler("risk", risk))
-    app.add_handler(CommandHandler("slot", slot))
-    app.add_handler(CommandHandler("admin", admin))
-    app.add_handler(CommandHandler("parabasma", parabasma))
-    app.add_handler(CommandHandler("paragonder", paragönder))
-    app.add_handler(CommandHandler("id", id))
-    app.add_handler(CommandHandler("top", top))
+# Bot başlat
+app = ApplicationBuilder().token("7763395301:AAF3thVNH883Rzmz0RTpsx3wuiCG_VLpa-g").build()
 
-    print("Bot çalışıyor...")
-    app.run_polling()
+app.add_handler(CommandHandler("start", start))
+app.add_handler(CommandHandler("bakiye", bakiye))
+app.add_handler(CommandHandler("bonus", bonus))
+app.add_handler(CommandHandler("kazikazan", kazikazan))
+app.add_handler(CommandHandler("risk", risk))
+app.add_handler(CommandHandler("slot", slot))
+app.add_handler(CommandHandler("admin", admin))
+app.add_handler(CommandHandler("parabasma", parabasma))
+app.add_handler(CommandHandler("paragönder", paragönder))
+app.add_handler(CommandHandler("id", id))
+app.add_handler(CommandHandler("top", top))
+
+app.run_polling()
