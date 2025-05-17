@@ -12,7 +12,9 @@ from betting import bahis, bahis_callback
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
 
-updater = Updater(config.TOKEN, use_context=True)
+from telegram.ext import ApplicationBuilder
+
+app = ApplicationBuilder().token(config.TOKEN).build()
 dispatcher = updater.dispatcher
 
 # Genel komutlar
