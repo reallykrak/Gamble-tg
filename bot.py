@@ -233,4 +233,4 @@ async def toplist(message: types.Message):
 # Botu çalıştır
 if __name__ == "__main__":
     print("Bot çalışıyor...")
-    executor.start_polling(dp, skip_updates=True)7763395301:AAF3thVNH883Rzmz0RTpsx3wuiCG_VLpa-g
+    executor.start_polling(dp, skip_updates=True)
