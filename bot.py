@@ -237,7 +237,7 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("slot", slot))
     app.add_handler(CommandHandler("admin", admin))
     app.add_handler(CommandHandler("parabasma", parabasma))
-    app.add_handler(CommandHandler("paragonder", paragonder))
+    app.add_handler(CommandHandler("paragönder", paragonder))
     app.add_handler(CommandHandler("id", id))
     app.add_handler(CommandHandler("top", top))
 
