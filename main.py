@@ -17,19 +17,19 @@ app = ApplicationBuilder().token(config.TOKEN).build()
 # Genel komutlar
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CallbackQueryHandler(katildim_callback, pattern="katildim"))
-app.add_handler(CommandHandler("yardım", yardim))
+app.add_handler(CommandHandler("yardim", yardim))  # Türkçe karakter düzeltildi
 app.add_handler(CommandHandler("bonus", bonus))
 app.add_handler(CommandHandler("bakiye", bakiye))
 app.add_handler(CommandHandler("istatistikler", istatistikler))
 app.add_handler(CommandHandler("top", top))
 app.add_handler(CommandHandler("id", user_id))
-app.add_handler(CommandHandler("gönder", gonder))
+app.add_handler(CommandHandler("gonder", gonder))  # Türkçe karakter düzeltildi
 
 # Banka / Döviz komutları
 app.add_handler(CommandHandler("bankayaekle", bankayaekle))
 app.add_handler(CommandHandler("bankadanal", bankadanal))
 app.add_handler(CommandHandler("banka", banka))
-app.add_handler(CommandHandler("döviz", doviz))
+app.add_handler(CommandHandler("doviz", doviz))  # Türkçe karakter düzeltildi
 
 # Oyun komutları
 app.add_handler(CommandHandler("slot", slot))
