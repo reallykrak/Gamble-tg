@@ -20,7 +20,7 @@ from telegram.ext import ApplicationBuilder
 app = ApplicationBuilder().token(config.TOKEN).build()
 
 # Genel komutlar
-dispatcher.add_handler(CommandHandler("start", start))
+app.add_handler(CommandHandler("start", start))
 dispatcher.add_handler(CallbackQueryHandler(katildim_callback, pattern="katildim"))
 dispatcher.add_handler(CommandHandler("yardım", yardim))
 dispatcher.add_handler(CommandHandler("bonus", bonus))
