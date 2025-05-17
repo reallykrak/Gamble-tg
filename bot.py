@@ -60,7 +60,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user["ilk_giris"]:
         user["tl"] += BAŞLANGIÇ_TL
         user["ilk_giris"] = False
-        msg = f"👋 Hoş geldin {update.effective_user.first_name}!\nHesabına başlangıç olarak 💸 {BAŞLANGIÇ_TL:,} coin yüklendi!"
+        msg = f"👋 Hoş geldin {update.effective_user.first_name}!\nHesabına başlangıç olarak 💸 {BAŞLANGIÇ_TL:,} TL yüklendi!"
     else:
         msg = f"👋 Tekrar hoş geldin {update.effective_user.first_name}!"
     
