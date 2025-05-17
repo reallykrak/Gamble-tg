@@ -84,7 +84,7 @@ async def bonus(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if now - son >= timedelta(seconds=BONUS_SÜRE):
         user["last_bonus"] = now.strftime("%Y-%m-%d %H:%M:%S")
         user["tl"] += BONUS_TL
-        msg = f"🎁 Günlük bonus alındı! +{BONUS_TL:,} coin"
+        msg = f"🎁 Günlük bonus alındı! +{BONUS_TL:,} TL"
     else:
         kalan = timedelta(seconds=BONUS_SÜRE) - (now - son)
         msg = f"⏳ Bonus zaten alındı!\nYeniden almak için bekle: {str(kalan).split('.')[0]}"
@@ -111,7 +111,7 @@ async def kazikazan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if random.randint(1, 100) <= 30:
         kazanç = miktar * 3
         user["tl"] += kazanç
-        msg = f"🎯 Tebrikler! Kazı Kazan'dan {kazanç:,} coin kazandın!"
+        msg = f"🎯 Tebrikler! Kazı Kazan'dan {kazanç:,} TL kazandın!"
     else:
         msg = "💀 Üzgünüm, bu sefer olmadı..."
     
@@ -137,7 +137,7 @@ async def risk(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if random.randint(1, 100) <= 40:
         kazanç = miktar * 2
         user["tl"] += kazanç
-        msg = f"⚡ Şanslısın! {kazanç:,} coin kazandın!"
+        msg = f"⚡ Şanslısın! {kazanç:,} TL kazandın!"
     else:
         msg = "💣 Kaybettin..."
 
@@ -161,7 +161,7 @@ async def slot(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user["tl"] -= miktar
 
-    semboller = ["🍇", "🍉", "🍊", "🍋", "🍈"]
+    semboller = ["🍇", "🍍", "🍒", "🏆", "🏆"]
     sonuç = [random.choice(semboller) for _ in range(3)]
 
     if sonuç[0] == sonuç[1] == sonuç[2]:
@@ -206,7 +206,7 @@ async def parabasma(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     kullanıcı_kontrol(hedef_id)
     tl_güncelle(hedef_id, miktar)
-    await update.message.reply_text(f"💸 {hedef_id} kişisine {miktar:,} coin basıldı!")
+    await update.message.reply_text(f"💸 {hedef_id} kişisine {miktar:,} TL basıldı!")
 
 async def paragönder(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -226,7 +226,7 @@ async def paragönder(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data[str(user_id)]["tl"] -= miktar
     data[str(hedef_id)]["tl"] += miktar
     veri_kaydet(data)
-    await update.message.reply_text(f"📤 {miktar:,} coin gönderildi!")
+    await update.message.reply_text(f"📤 {miktar:,} TL gönderildi!")
 
 async def id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.reply_to_message:
