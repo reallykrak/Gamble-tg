@@ -62,4 +62,4 @@ def coinals(update, context):
         update.message.reply_text("⚠️ Hedef kullanıcı bulunamadı!")
         return
 
-    data["users"][target]["coin"] -=
+    data["users"][target]["coin"] -= amount
